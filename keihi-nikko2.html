@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>経費日航 - 軽貨物ドライバー経費管理</title>
+<style>
+:root {
+  --bg:#0d1117;--surface:#161b22;--surface2:#1f2937;--border:#2d333b;
+  --accent:#0ea5e9;--accent2:#38bdf8;--green:#22c55e;--red:#ef4444;
+  --yellow:#f59e0b;--purple:#a78bfa;--text:#e6edf3;--text2:#8b949e;--text3:#484f58;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'BIZ UDPGothic','Noto Sans JP',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;max-width:480px;margin:0 auto;}
+.header{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10;}
+.header-title{font-size:17px;font-weight:700;color:var(--accent);letter-spacing:1px;}
+.header-sub{font-size:11px;color:var(--text2);margin-top:1px;}
+.year-select{background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:7px;font-size:13px;}
+.tabs{display:flex;background:var(--surface);border-bottom:1px solid var(--border);}
+.tab{flex:1;padding:11px 0;text-align:center;font-size:12px;font-weight:600;color:var(--text3);border-bottom:2px solid transparent;cursor:pointer;transition:all 0.2s;}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent);}
+.content{padding-bottom:80px;}
+.section{margin:14px 14px 0;}
+.slabel{font-size:11px;color:var(--text2);font-weight:700;letter-spacing:1px;margin-bottom:8px;text-transform:uppercase;}
+.slabel.purple{color:var(--purple);}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:10px;}
+.card.home{border-color:#4c1d95;}
+.form-row{display:flex;gap:8px;margin-bottom:8px;}
+.form-group{flex:1;}
+.form-label{font-size:11px;color:var(--text2);margin-bottom:4px;display:block;}
+input,select,textarea{width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:10px 12px;border-radius:8px;font-size:14px;font-family:inherit;outline:none;transition:border-color 0.2s;}
+input:focus,select:focus{border-color:var(--accent);}
+textarea{resize:none;height:60px;font-size:13px;}
+.cats{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px;}
+.cat-group-label{grid-column:1/-1;font-size:10px;color:var(--text3);font-weight:700;letter-spacing:1px;padding:6px 0 3px;border-bottom:1px solid var(--border);margin-bottom:2px;}
+.cat-chip{padding:10px 8px;background:var(--surface2);border:2px solid var(--border);border-radius:8px;text-align:center;cursor:pointer;transition:all 0.2s;font-size:12px;color:var(--text2);}
+.cat-chip.sel{border-color:var(--accent);background:#0c2033;color:var(--accent2);font-weight:700;}
+.cat-chip.sel.home{border-color:var(--purple);background:#2e1065;color:var(--purple);}
+.cat-chip .ci{font-size:18px;display:block;margin-bottom:3px;}
+.btn{width:100%;padding:13px;border:none;border-radius:9px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;}
+.btn:active{opacity:0.7;}
+.btn-primary{background:var(--accent);color:#fff;}
+.btn-green{background:#14532d;color:var(--green);border:1px solid #166534;}
+.eitem{padding:12px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;}
+.eitem:last-child{border-bottom:none;}
+.eicon{font-size:22px;width:36px;text-align:center;flex-shrink:0;}
+.einfo{flex:1;min-width:0;}
+.etitle{font-size:14px;font-weight:600;color:var(--text);}
+.emeta{font-size:11px;color:var(--text2);margin-top:2px;}
+.eamt{text-align:right;flex-shrink:0;}
+.eamt-val{font-size:15px;font-weight:700;color:var(--text);}
+.eamt-ded{font-size:11px;color:var(--green);margin-top:1px;}
+.eamt-ded.purple{color:var(--purple);}
+.edel{background:none;border:none;color:var(--text3);font-size:18px;cursor:pointer;padding:4px;}
+.sgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;}
+.scard{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;}
+.scard.full{grid-column:1/-1;}
+.scard.hl{border-color:var(--accent);background:#0c1f2e;}
+.scard.hlp{border-color:var(--purple);background:#1e0a3c;}
+.slb{font-size:11px;color:var(--text2);margin-bottom:6px;}
+.sval{font-size:20px;font-weight:700;color:var(--text);}
+.sval.ac{color:var(--accent2);}
+.sval.gr{color:var(--green);}
+.sval.pu{color:var(--purple);}
+.ssub{font-size:11px;color:var(--text2);margin-top:3px;}
+.abox{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px;}
+.abox.home{border-color:#4c1d95;background:#12082a;}
+.atitle{font-size:13px;font-weight:700;color:var(--text);margin-bottom:10px;}
+.arow{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px;}
+.arow:last-child{border-bottom:none;}
+.albl{color:var(--text2);}
+.aval{font-weight:600;color:var(--text);}
+.aval.gr{color:var(--green);}
+.aval.pu{color:var(--purple);}
+.pbar{height:8px;background:var(--surface2);border-radius:4px;overflow:hidden;margin:8px 0;}
+.pfill{height:100%;background:linear-gradient(90deg,var(--accent),var(--green));border-radius:4px;transition:width 0.5s;}
+.pfill.pu{background:linear-gradient(90deg,#7c3aed,var(--purple));}
+.mnav{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--surface);border-bottom:1px solid var(--border);}
+.mlbl{font-size:16px;font-weight:700;color:var(--text);}
+.mbtn{background:var(--surface2);border:1px solid var(--border);color:var(--text2);padding:6px 14px;border-radius:7px;cursor:pointer;font-size:14px;}
+.empty{text-align:center;padding:50px 20px;color:var(--text3);}
+.empty-icon{font-size:40px;margin-bottom:10px;}
+.empty-text{font-size:13px;line-height:1.8;}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:100;display:flex;align-items:flex-end;}
+.modal-box{background:var(--surface);border-radius:16px 16px 0 0;width:100%;max-width:480px;margin:0 auto;padding:20px 16px 36px;max-height:90vh;overflow-y:auto;}
+.modal-title{font-size:16px;font-weight:700;margin-bottom:16px;color:var(--text);}
+.mclose{float:right;background:none;border:none;color:var(--text2);font-size:22px;cursor:pointer;}
+.fab{position:fixed;bottom:24px;right:calc(50% - 228px);background:var(--accent);color:#fff;border:none;border-radius:50px;padding:14px 24px;font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 4px 20px rgba(14,165,233,0.4);z-index:50;display:flex;align-items:center;gap:8px;font-family:inherit;}
+@media(max-width:480px){.fab{right:16px;}}
+.srow{padding:14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.srow:last-child{border-bottom:none;}
+.srlbl{font-size:14px;color:var(--text);}
+.srsub{font-size:11px;color:var(--text2);margin-top:2px;}
+.sinput{width:110px;text-align:right;}
+.depr-box{background:#1e0a3c;border:1px solid #4c1d95;border-radius:8px;padding:12px 14px;margin-top:8px;}
+.depr-lbl{font-size:11px;color:var(--purple);margin-bottom:4px;}
+.depr-val{font-size:20px;font-weight:700;color:var(--purple);}
+.depr-sub{font-size:11px;color:var(--text2);margin-top:3px;}
+.warn-box{background:#1a0a00;border:1px solid #92400e;border-radius:10px;padding:12px 14px;font-size:13px;color:var(--yellow);margin-bottom:10px;}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body>
+<div class="header">
+  <div><div class="header-title">⛽ 経費日航</div><div class="header-sub">軽貨物ドライバー経費管理</div></div>
+  <select class="year-select" id="yearSel" onchange="changeYear()"></select>
+</div>
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('input')">経費入力</div>
+  <div class="tab" onclick="switchTab('summary')">年次集計</div>
+  <div class="tab" onclick="switchTab('settings')">設定</div>
+</div>
+<div class="content" id="content"></div>
+<button class="fab" id="fab" onclick="openModal()">＋ 経費を追加</button>
+
+<div class="modal-overlay" id="modal" style="display:none" onclick="closeModal(event)">
+  <div class="modal-box" onclick="e=>e.stopPropagation()">
+    <div class="modal-title">経費を追加 <button class="mclose" onclick="closeModal()">✕</button></div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">日付</label><input type="date" id="fd"></div>
+      <div class="form-group"><label class="form-label">金額（円）</label><input type="number" id="fa" placeholder="0"></div>
+    </div>
+    <label class="form-label">カテゴリ</label>
+    <div class="cats" id="chips"></div>
+    <label class="form-label">メモ（任意）</label>
+    <textarea id="fm" placeholder="例：○○GS、固定資産税第1期など"></textarea>
+    <div style="height:12px"></div>
+    <button class="btn btn-primary" onclick="addExp()">追加する</button>
+  </div>
+</div>
+
+<script>
+const GROUPS=[
+  {label:'🚗 車両・通信費',cats:[
+    {key:'gas',     icon:'⛽',label:'ガソリン代',  type:'car',  kamoku:'車両費'},
+    {key:'etc',     icon:'🛣', label:'高速・ETC',  type:'car',  kamoku:'旅費交通費'},
+    {key:'parking', icon:'🅿️',label:'駐車場代',   type:'car',  kamoku:'旅費交通費'},
+    {key:'vehicle', icon:'🔧',label:'車両維持費',  type:'car',  kamoku:'車両費'},
+    {key:'phone',   icon:'📱',label:'通信費',      type:'phone',kamoku:'通信費'},
+    {key:'other',   icon:'📦',label:'その他',      type:'full', kamoku:'雑費'},
+  ]},
+  {label:'🏠 自宅経費（持ち家）',cats:[
+    {key:'loan',    icon:'🏠',label:'ローン利息',  type:'home', kamoku:'利子割引料'},
+    {key:'ftax',    icon:'📋',label:'固定資産税',  type:'home', kamoku:'租税公課'},
+    {key:'finsure', icon:'🔥',label:'火災保険料',  type:'home', kamoku:'損害保険料'},
+  ]}
+];
+const ALL=GROUPS.flatMap(g=>g.cats);
+const HOME_KEYS=['loan','ftax','finsure'];
+
+const SK='keihi-v3-exp',STK='keihi-v3-st';
+function ld(k,d){try{return JSON.parse(localStorage.getItem(k))||d;}catch{return d;}}
+function sv(k,v){localStorage.setItem(k,JSON.stringify(v));}
+
+let expenses=ld(SK,[]);
+let cfg=ld(STK,{carRatio:80,phoneRatio:50,haisoData:null,totalKm:0,
+  totalFloor:0,officeFloor:0,parkingFloor:0,
+  buildingCost:0,buildingStructure:'wood',buildingYear:2000});
+
+let tab='input',curMonth=tod().slice(0,7),curYear=tod().slice(0,4),selCat='gas';
+function tod(){return new Date().toISOString().slice(0,10);}
+
+// ── 按分計算 ──
+function carAnbun(){
+  let bKm=0,tKm=cfg.totalKm||0;
+  if(cfg.haisoData){
+    (cfg.haisoData.records||[]).filter(r=>r.date&&r.date.startsWith(curYear)).forEach(r=>{
+      if(r.odometerStart&&r.odometerEnd)bKm+=parseFloat(r.odometerEnd)-parseFloat(r.odometerStart);
+    });
+    tKm=Math.max(tKm,bKm);
+  }
+  const ratio=tKm>0&&bKm>0?Math.min(100,Math.round(bKm/tKm*100)):cfg.carRatio;
+  return{bKm:Math.round(bKm),tKm:Math.round(tKm),ratio};
+}
+function homeAnbun(){
+  const{totalFloor:tf,officeFloor:of,parkingFloor:pf}=cfg;
+  return{
+    office:tf>0&&of>0?Math.min(100,Math.round(of/tf*100)):0,
+    parking:tf>0&&pf>0?Math.min(100,Math.round(pf/tf*100)):0
+  };
+}
+function calcDepr(){
+  const{buildingCost:bc,buildingStructure:bs,officeFloor:of,totalFloor:tf}=cfg;
+  if(!bc||!of||!tf)return 0;
+  const rates={wood:0.046,steel:0.038,rc:0.022};
+  return Math.floor(bc*0.9*(rates[bs]||0.046)*(of/tf));
+}
+function anbunRatio(cat){
+  if(cat==='other')return 100;
+  if(cat==='phone')return cfg.phoneRatio;
+  if(HOME_KEYS.includes(cat))return homeAnbun().office;
+  return carAnbun().ratio;
+}
+function getCat(key){return ALL.find(c=>c.key===key)||ALL.find(c=>c.key==='other');}
+
+// ── INIT ──
+function initYear(){
+  const sel=document.getElementById('yearSel'),yr=new Date().getFullYear();
+  for(let y=yr;y>=yr-3;y--){const o=document.createElement('option');o.value=y;o.textContent=y+'年';if(String(y)===curYear)o.selected=true;sel.appendChild(o);}
+}
+function changeYear(){curYear=document.getElementById('yearSel').value;curMonth=curYear+'-'+curMonth.slice(5);render();}
+
+function switchTab(t){
+  tab=t;
+  document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('active',['input','summary','settings'][i]===t));
+  document.getElementById('fab').style.display=t==='input'?'flex':'none';
+  render();
+}
+
+function render(){
+  const c=document.getElementById('content');c.innerHTML='';
+  if(tab==='input')rInput(c);
+  else if(tab==='summary')rSummary(c);
+  else rSettings(c);
+}
+
+// ── INPUT ──
+function rInput(c){
+  const nav=mk('div','mnav');
+  nav.append(mbtn('＜',()=>shiftM(-1)),mk('div','mlbl',curMonth.replace('-','年')+'月'),mbtn('＞',()=>shiftM(1)));
+  c.appendChild(nav);
+
+  const mexp=expenses.filter(e=>e.date.startsWith(curMonth)).sort((a,b)=>b.date.localeCompare(a.date));
+  if(!mexp.length){c.appendChild(emptyEl('📋','この月の経費がありません\n右下の＋から追加'));return;}
+
+  const card=mk('div','card');
+  mexp.forEach(e=>{
+    const cat=getCat(e.cat),ratio=anbunRatio(e.cat),ded=Math.floor(e.amount*ratio/100),isH=HOME_KEYS.includes(e.cat);
+    const item=mk('div','eitem');
+    item.innerHTML=`<div class="eicon">${cat.icon}</div><div class="einfo"><div class="etitle">${cat.label}</div><div class="emeta">${e.date}${e.memo?' 　'+e.memo:''} <span style="font-size:10px;color:${isH?'var(--purple)':'var(--accent2)'}">[按分${ratio}%]</span></div></div><div class="eamt"><div class="eamt-val">¥${e.amount.toLocaleString()}</div><div class="eamt-ded ${isH?'purple':''}">控除 ¥${ded.toLocaleString()}</div></div><button class="edel" onclick="delExp('${e.id}')">✕</button>`;
+    card.appendChild(item);
+  });
+  const total=mexp.reduce((s,e)=>s+e.amount,0),dedTot=mexp.reduce((s,e)=>s+Math.floor(e.amount*anbunRatio(e.cat)/100),0);
+  const foot=mk('div','');foot.style.cssText='padding:12px 14px;background:#0c1f2e;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center';
+  foot.innerHTML=`<span style="font-size:13px;color:var(--text2)">${mexp.length}件</span><div style="text-align:right"><div style="font-size:16px;font-weight:700">¥${total.toLocaleString()}</div><div style="font-size:11px;color:var(--green)">控除 ¥${dedTot.toLocaleString()}</div></div>`;
+  card.appendChild(foot);
+  const sec=mk('div','section');sec.appendChild(card);c.appendChild(sec);
+}
+
+// ── SUMMARY ──
+function rSummary(c){
+  const yexp=expenses.filter(e=>e.date.startsWith(curYear));
+  const depr=calcDepr(),ha=homeAnbun(),ca=carAnbun();
+  const totalDed=yexp.reduce((s,e)=>s+Math.floor(e.amount*anbunRatio(e.cat)/100),0)+depr;
+
+  // 総合
+  const s0=mk('div','section');
+  const g0=mk('div','sgrid');
+  g0.innerHTML=`<div class="scard hl full"><div class="slb">💰 年間経費控除合計（見込み）</div><div class="sval ac">¥${totalDed.toLocaleString()}</div><div class="ssub">車両・通信費 ＋ 自宅経費 ＋ 減価償却費 合算</div></div>`;
+  s0.appendChild(g0);c.appendChild(s0);
+
+  // 車両費
+  const s1=mk('div','section');s1.appendChild(slbl('🚗 車両・通信費'));
+  const g1=mk('div','sgrid');
+  const carExp=yexp.filter(e=>!HOME_KEYS.includes(e.cat));
+  const carTot=carExp.reduce((s,e)=>s+e.amount,0),carDed=carExp.reduce((s,e)=>s+Math.floor(e.amount*anbunRatio(e.cat)/100),0);
+  g1.innerHTML=`<div class="scard full"><div class="slb">経費控除額</div><div class="sval gr">¥${carDed.toLocaleString()}</div><div class="ssub">総支出 ¥${carTot.toLocaleString()} / 車按分 ${ca.ratio}%</div></div>`;
+  ALL.filter(cat=>!HOME_KEYS.includes(cat.key)).forEach(cat=>{
+    const ce=yexp.filter(e=>e.cat===cat.key),amt=ce.reduce((s,e)=>s+e.amount,0);
+    if(!amt)return;
+    const ded=ce.reduce((s,e)=>s+Math.floor(e.amount*anbunRatio(e.cat)/100),0);
+    const sc=mk('div','scard');sc.innerHTML=`<div class="slb">${cat.icon} ${cat.label}</div><div class="sval" style="font-size:15px">¥${amt.toLocaleString()}</div><div class="ssub" style="color:var(--green)">控除 ¥${ded.toLocaleString()}</div>`;
+    g1.appendChild(sc);
+  });
+  s1.appendChild(g1);c.appendChild(s1);
+
+  // 自宅経費
+  const s2=mk('div','section');s2.appendChild(slbl('🏠 自宅経費（持ち家）',true));
+  if(ha.office===0){const w=mk('div','warn-box');w.textContent='⚠️ 設定タブで面積を入力すると按分率が自動計算されます';s2.appendChild(w);}
+  const g2=mk('div','sgrid');
+  g2.innerHTML=`<div class="scard hlp full"><div class="slb">📐 事務室按分率（面積割合）</div><div class="sval pu">${ha.office}%</div><div class="ssub">${cfg.officeFloor}㎡ ÷ ${cfg.totalFloor}㎡${cfg.parkingFloor?'　駐車場: '+ha.parking+'%':''}</div></div>`;
+  const homeExp=yexp.filter(e=>HOME_KEYS.includes(e.cat));
+  const homeTot=homeExp.reduce((s,e)=>s+e.amount,0),homeDed=homeExp.reduce((s,e)=>s+Math.floor(e.amount*anbunRatio(e.cat)/100),0);
+  const g2b=mk('div','sgrid');
+  g2b.innerHTML=`<div class="scard full"><div class="slb">現金支出の控除額</div><div class="sval pu" style="font-size:17px">¥${homeDed.toLocaleString()}</div><div class="ssub">支出合計 ¥${homeTot.toLocaleString()}</div></div>`;
+  HOME_KEYS.forEach(key=>{
+    const ce=yexp.filter(e=>e.cat===key),amt=ce.reduce((s,e)=>s+e.amount,0);
+    if(!amt)return;
+    const cat=getCat(key),ded=ce.reduce((s,e)=>s+Math.floor(e.amount*anbunRatio(e.cat)/100),0);
+    const sc=mk('div','scard');sc.innerHTML=`<div class="slb">${cat.icon} ${cat.label}</div><div class="sval" style="font-size:15px">¥${amt.toLocaleString()}</div><div class="ssub" style="color:var(--purple)">控除 ¥${ded.toLocaleString()}</div>`;
+    g2b.appendChild(sc);
+  });
+  // 減価償却
+  const deprRates={wood:'0.046',steel:'0.038',rc:'0.022'};
+  const dbox=mk('div','depr-box');
+  dbox.innerHTML=`<div class="depr-lbl">🏗 減価償却費（定額法・自動計算）</div><div class="depr-val">¥${depr.toLocaleString()} <span style="font-size:13px">/ 年</span></div><div class="depr-sub">取得価額 ¥${(cfg.buildingCost||0).toLocaleString()} × 0.9 × 償却率${deprRates[cfg.buildingStructure]||'0.046'} × 事務室${ha.office}%</div>`;
+  s2.appendChild(g2);s2.appendChild(g2b);s2.appendChild(dbox);c.appendChild(s2);
+
+  // 按分詳細
+  const s3=mk('div','section');s3.appendChild(slbl('家事按分 詳細'));
+  const ab1=mk('div','abox');
+  ab1.innerHTML=`<div class="atitle">🚗 車両按分</div><div class="pbar"><div class="pfill" style="width:${ca.ratio}%"></div></div><div class="arow"><span class="albl">事業使用割合</span><span class="aval gr">${ca.ratio}%</span></div>${cfg.haisoData?`<div class="arow"><span class="albl">業務走行距離</span><span class="aval">${ca.bKm.toLocaleString()} km</span></div>`:''}
+  <div class="arow"><span class="albl">📱 通信費按分</span><span class="aval gr">${cfg.phoneRatio}%</span></div>`;
+  const ab2=mk('div','abox home');
+  ab2.innerHTML=`<div class="atitle">🏠 自宅按分（面積割合）</div><div class="pbar"><div class="pfill pu" style="width:${ha.office}%"></div></div><div class="arow"><span class="albl">事務室</span><span class="aval pu">${ha.office}%（${cfg.officeFloor}㎡÷${cfg.totalFloor}㎡）</span></div>${cfg.parkingFloor?`<div class="arow"><span class="albl">駐車場（家屋内）</span><span class="aval pu">${ha.parking}%（${cfg.parkingFloor}㎡÷${cfg.totalFloor}㎡）</span></div>`:''}`;
+  s3.appendChild(ab1);s3.appendChild(ab2);c.appendChild(s3);
+
+  // CSV
+  const s4=mk('div','section');
+  const eb=document.createElement('button');eb.className='btn btn-green';eb.textContent='📥 CSVエクスポート（freee・弥生対応）';eb.onclick=exportCSV;
+  s4.appendChild(eb);const sp=mk('div','');sp.style.height='12px';s4.appendChild(sp);c.appendChild(s4);
+}
+
+// ── SETTINGS ──
+function rSettings(c){
+  // haisonikko
+  const s1=mk('div','section');s1.appendChild(slbl('haisonikko 連携'));
+  const ib=mk('div','import-box'+(cfg.haisoData?' import-success':''));
+  ib.innerHTML=cfg.haisoData
+    ?`<div style="font-size:32px;margin-bottom:8px">✅</div><div style="font-size:14px;font-weight:700;color:var(--green)">データ読み込み済み</div><div style="font-size:12px;color:var(--text2)">${carAnbun().bKm.toLocaleString()} km（${curYear}年）／タップして更新</div>`
+    :`<div style="font-size:32px;margin-bottom:8px">📂</div><div style="font-size:14px;font-weight:700;color:var(--text)">haisonikkoのJSONを読み込む</div><div style="font-size:12px;color:var(--text2)">走行距離から車の按分を自動計算</div>`;
+  ib.style.cssText='border:2px dashed var(--border);border-radius:10px;padding:20px;text-align:center;cursor:pointer;margin-bottom:10px;';
+  ib.onclick=()=>document.getElementById('jfi').click();
+  const jfi=document.createElement('input');jfi.type='file';jfi.accept='.json';jfi.id='jfi';jfi.style.display='none';jfi.onchange=impHaiso;
+  s1.appendChild(ib);s1.appendChild(jfi);c.appendChild(s1);
+
+  // 車両按分
+  const s2=mk('div','section');s2.appendChild(slbl('車両・通信費 按分設定'));
+  const c2=mk('div','card');
+  c2.innerHTML=`
+    <div class="srow"><div><div class="srlbl">🚗 車両按分</div><div class="srsub">${cfg.haisoData?'haisonikkoから自動計算':'手動設定'}</div></div>
+    ${cfg.haisoData?`<span style="color:var(--green);font-weight:700">${carAnbun().ratio}%　自動</span>`:`<div style="display:flex;align-items:center;gap:4px"><input type="number" class="sinput" value="${cfg.carRatio}" min="0" max="100" onchange="upCfg('carRatio',this.value)"><span style="color:var(--text2)">%</span></div>`}</div>
+    <div class="srow"><div><div class="srlbl">📱 通信費按分</div></div><div style="display:flex;align-items:center;gap:4px"><input type="number" class="sinput" value="${cfg.phoneRatio}" min="0" max="100" onchange="upCfg('phoneRatio',this.value)"><span style="color:var(--text2)">%</span></div></div>
+    ${!cfg.haisoData?`<div class="srow"><div><div class="srlbl">年間総走行距離</div><div class="srsub">プライベート含む全走行距離</div></div><div style="display:flex;align-items:center;gap:4px"><input type="number" class="sinput" value="${cfg.totalKm}" min="0" onchange="upCfg('totalKm',this.value)"><span style="color:var(--text2)">km</span></div></div>`:''}
+  `;
+  s2.appendChild(c2);c.appendChild(s2);
+
+  // 自宅面積
+  const s3=mk('div','section');s3.appendChild(slbl('🏠 自宅 面積設定',true));
+  const c3=mk('div','card home');
+  c3.innerHTML=`
+    <div class="srow"><div><div class="srlbl">総床面積</div><div class="srsub">家全体の延べ床面積</div></div><div style="display:flex;align-items:center;gap:4px"><input type="number" class="sinput" value="${cfg.totalFloor}" min="0" step="0.1" onchange="upCfgF('totalFloor',this.value)"><span style="color:var(--text2)">㎡</span></div></div>
+    <div class="srow"><div><div class="srlbl">事務室面積</div><div class="srsub">仕事専用の部屋・スペース</div></div><div style="display:flex;align-items:center;gap:4px"><input type="number" class="sinput" value="${cfg.officeFloor}" min="0" step="0.1" onchange="upCfgF('officeFloor',this.value)"><span style="color:var(--text2)">㎡</span></div></div>
+    <div class="srow"><div><div class="srlbl">駐車場面積</div><div class="srsub">家屋に含まれる場合のみ入力</div></div><div style="display:flex;align-items:center;gap:4px"><input type="number" class="sinput" value="${cfg.parkingFloor}" min="0" step="0.1" onchange="upCfgF('parkingFloor',this.value)"><span style="color:var(--text2)">㎡</span></div></div>
+  `;
+  if(cfg.totalFloor>0){
+    const ha=homeAnbun(),res=mk('div','');
+    res.style.cssText='padding:10px 14px;background:#1e0a3c;border-top:1px solid #4c1d95;font-size:13px;';
+    res.innerHTML=`<span style="color:var(--purple)">📐 事務室按分率：<strong>${ha.office}%</strong></span>${cfg.parkingFloor?`　駐車場：<strong>${ha.parking}%</strong>`:''}`;
+    c3.appendChild(res);
+  }
+  s3.appendChild(c3);c.appendChild(s3);
+
+  // 減価償却
+  const s4=mk('div','section');s4.appendChild(slbl('🏗 減価償却費 設定（自動計算）',true));
+  const c4=mk('div','card home');
+  c4.innerHTML=`
+    <div class="srow"><div><div class="srlbl">建物取得価額</div><div class="srsub">土地を除いた建物のみの金額</div></div><div style="display:flex;align-items:center;gap:4px"><input type="number" class="sinput" style="width:130px" value="${cfg.buildingCost}" min="0" onchange="upCfg('buildingCost',this.value)"><span style="color:var(--text2)">円</span></div></div>
+    <div class="srow"><div><div class="srlbl">構造</div></div><select style="width:150px;padding:8px 10px" onchange="upCfgS('buildingStructure',this.value)"><option value="wood" ${cfg.buildingStructure==='wood'?'selected':''}>木造（耐用22年）</option><option value="steel" ${cfg.buildingStructure==='steel'?'selected':''}>軽量鉄骨（27年）</option><option value="rc" ${cfg.buildingStructure==='rc'?'selected':''}>RC・鉄筋（47年）</option></select></div>
+    <div class="srow"><div><div class="srlbl">取得年（西暦）</div></div><div style="display:flex;align-items:center;gap:4px"><input type="number" class="sinput" value="${cfg.buildingYear}" min="1950" max="2030" onchange="upCfg('buildingYear',this.value)"><span style="color:var(--text2)">年</span></div></div>
+  `;
+  const depr=calcDepr(),ha2=homeAnbun(),rates={wood:'0.046',steel:'0.038',rc:'0.022'};
+  const drbox=mk('div','depr-box');
+  drbox.innerHTML=`<div class="depr-lbl">年間控除額（${curYear}年）</div><div class="depr-val">¥${depr.toLocaleString()}</div><div class="depr-sub">取得価額×0.9×償却率${rates[cfg.buildingStructure]||'0.046'}×事務室${ha2.office}%　定額法</div>`;
+  c4.appendChild(drbox);s4.appendChild(c4);c.appendChild(s4);
+
+  // データ管理
+  const s5=mk('div','section');s5.appendChild(slbl('データ管理'));
+  const c5=mk('div','card');
+  const r1=srow('💾 バックアップ（JSON）',expJSON);
+  const r2=srow('📂 復元（JSON）',()=>document.getElementById('rfi').click());
+  const rxls=srow('📊 Excelファイルをインポート（.xlsx/.xls）',()=>document.getElementById('xlsfi').click());
+  const r3=srow('🗑 全データを削除',()=>{if(confirm('全経費データを削除しますか？')){expenses=[];sv(SK,expenses);render();}});
+  r3.querySelector('.srlbl').style.color='var(--red)';
+  const rfi=document.createElement('input');rfi.type='file';rfi.accept='.json';rfi.id='rfi';rfi.style.display='none';rfi.onchange=restJSON;
+  const xlsfi=document.createElement('input');xlsfi.type='file';xlsfi.accept='.xlsx,.xls';xlsfi.id='xlsfi';xlsfi.style.display='none';xlsfi.onchange=impExcel;
+  c5.append(r1,r2,rxls,r3,rfi,xlsfi);s5.appendChild(c5);
+  const sp=mk('div','');sp.style.height='12px';c.appendChild(s5);c.appendChild(sp);
+}
+
+// ── MODAL ──
+function openModal(){document.getElementById('fd').value=tod();document.getElementById('fa').value='';document.getElementById('fm').value='';buildChips();document.getElementById('modal').style.display='flex';}
+function closeModal(e){if(!e||e.target===document.getElementById('modal'))document.getElementById('modal').style.display='none';}
+function buildChips(){
+  const cont=document.getElementById('chips');cont.innerHTML='';
+  GROUPS.forEach(g=>{
+    const gl=document.createElement('div');gl.className='cat-group-label';gl.textContent=g.label;cont.appendChild(gl);
+    g.cats.forEach(cat=>{
+      const isH=HOME_KEYS.includes(cat.key),sel=cat.key===selCat;
+      const ch=document.createElement('div');ch.className=`cat-chip${sel?' sel':''}${sel&&isH?' home':''}`;
+      ch.innerHTML=`<span class="ci">${cat.icon}</span>${cat.label}`;
+      ch.onclick=()=>{selCat=cat.key;buildChips();};
+      cont.appendChild(ch);
+    });
+  });
+}
+function addExp(){
+  const date=document.getElementById('fd').value,amount=parseInt(document.getElementById('fa').value),memo=document.getElementById('fm').value.trim();
+  if(!date||!amount||amount<=0){alert('日付と金額を入力してください');return;}
+  expenses.push({id:Date.now().toString(),date,cat:selCat,amount,memo});sv(SK,expenses);closeModal();curMonth=date.slice(0,7);render();
+}
+function delExp(id){if(!confirm('削除しますか？'))return;expenses=expenses.filter(e=>e.id!==id);sv(SK,expenses);render();}
+
+// ── IMPORT / EXPORT ──
+function impHaiso(e){
+  const file=e.target.files[0];if(!file)return;
+  const r=new FileReader();r.onload=ev=>{try{const d=JSON.parse(ev.target.result);if(!d.records){alert('haisonikkoのファイルではありません');return;}cfg.haisoData=d;sv(STK,cfg);alert('✅ 読み込み完了');render();}catch{alert('読み込み失敗');}};
+  r.readAsText(file);e.target.value='';
+}
+function exportCSV(){
+  const yexp=expenses.filter(e=>e.date.startsWith(curYear)).sort((a,b)=>a.date.localeCompare(b.date));
+  const depr=calcDepr();
+  const rows=[['日付','勘定科目','カテゴリ','金額','事業按分%','経費控除額','メモ']];
+  yexp.forEach(e=>{const cat=getCat(e.cat),ratio=anbunRatio(e.cat);rows.push([e.date,cat.kamoku,cat.label,e.amount,ratio,Math.floor(e.amount*ratio/100),e.memo||'']);});
+  if(depr>0)rows.push([curYear+'-12-31','減価償却費','建物（事務室）',depr,100,depr,'定額法・面積按分済み']);
+  dl(new Blob(['\uFEFF'+rows.map(r=>r.map(v=>`"${v}"`).join(',')).join('\n')],{type:'text/csv;charset=utf-8'}),`経費_${curYear}.csv`);
+}
+function expJSON(){dl(new Blob([JSON.stringify({expenses,cfg,exportedAt:new Date().toISOString()},null,2)],{type:'application/json'}),`経費BK_${tod()}.json`);}
+function restJSON(e){
+  const file=e.target.files[0];if(!file)return;
+  const r=new FileReader();r.onload=ev=>{try{const d=JSON.parse(ev.target.result);if(d.expenses){expenses=d.expenses;sv(SK,expenses);}if(d.cfg){cfg=d.cfg;sv(STK,cfg);}alert('✅ 復元しました');render();}catch{alert('失敗しました');}};
+  r.readAsText(file);e.target.value='';
+}
+
+// ── EXCEL インポート ──
+function impExcel(e){
+  const file=e.target.files[0];if(!file)return;
+  const r=new FileReader();
+  r.onload=ev=>{
+    try{
+      const wb=XLSX.read(ev.target.result,{type:'array',cellDates:true});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+      if(rows.length<2){alert('データが見つかりませんでした');return;}
+
+      // ヘッダー行を検出
+      const headers=rows[0].map(h=>String(h).trim());
+      const dataRows=rows.slice(1).filter(r=>r.some(v=>v!==''));
+
+      // 列インデックスを自動検出
+      function findCol(...keywords){return headers.findIndex(h=>keywords.some(k=>h.includes(k)));}
+      const colDate =findCol('日付','date','年月日','DATE');
+      const colAmt  =findCol('金額','amount','支出','費用','AMT');
+      const colCat  =findCol('カテゴリ','category','種別','科目','分類');
+      const colMemo =findCol('メモ','memo','備考','摘要','MEMO');
+
+      if(colDate<0||colAmt<0){
+        alert('「日付」と「金額」の列が見つかりませんでした。\nヘッダー行に「日付」「金額」の文字を含む列が必要です。');
+        return;
+      }
+
+      // カテゴリキー変換
+      function guessCat(str){
+        const s=String(str||'');
+        if(/ガソリン|給油|燃料/i.test(s))return'gas';
+        if(/高速|ETC|etc|有料道路/i.test(s))return'etc';
+        if(/駐車/i.test(s))return'parking';
+        if(/車両|修理|オイル|タイヤ|整備|部品/i.test(s))return'vehicle';
+        if(/通信|スマホ|携帯|電話/i.test(s))return'phone';
+        if(/ローン|利息|利子/i.test(s))return'loan';
+        if(/固定資産税/i.test(s))return'ftax';
+        if(/火災|保険/i.test(s))return'finsure';
+        return'other';
+      }
+
+      // 日付を YYYY-MM-DD に変換
+      function parseDate(v){
+        if(!v)return null;
+        if(v instanceof Date){const y=v.getFullYear(),m=String(v.getMonth()+1).padStart(2,'0'),d=String(v.getDate()).padStart(2,'0');return`${y}-${m}-${d}`;}
+        const s=String(v).replace(/[年\/]/g,'-').replace(/[月日]/g,'').trim();
+        const m=/(\d{4})-?(\d{1,2})-?(\d{1,2})/.exec(s);
+        if(m)return`${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;
+        // Excel シリアル値（数値）の場合
+        if(!isNaN(v)){const d=XLSX.SSF.parse_date_code(Number(v));if(d)return`${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`;}
+        return null;
+      }
+
+      // プレビューデータ作成
+      const preview=[];
+      dataRows.forEach(row=>{
+        const date=parseDate(row[colDate]);
+        const amount=parseInt(String(row[colAmt]).replace(/[,，￥¥\s]/g,''));
+        if(!date||!amount||amount<=0)return;
+        const catRaw=colCat>=0?row[colCat]:'';
+        const cat=guessCat(catRaw);
+        const memo=colMemo>=0?String(row[colMemo]||''):'';
+        preview.push({date,amount,cat,memo,_catRaw:String(catRaw)});
+      });
+
+      if(!preview.length){alert('有効な行（日付＋金額）が見つかりませんでした');return;}
+      showExcelPreview(preview);
+    }catch(err){alert('読み込みエラー: '+err.message);}
+  };
+  r.readAsArrayBuffer(file);
+  e.target.value='';
+}
+
+function showExcelPreview(rows){
+  const ov=document.createElement('div');
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:200;display:flex;align-items:flex-end;';
+
+  const cats=Object.fromEntries(ALL.map(c=>[c.key,c]));
+  let html=`<div style="background:#161b22;border-radius:16px 16px 0 0;width:100%;max-width:480px;margin:0 auto;padding:20px 16px 36px;max-height:85vh;overflow-y:auto;">
+    <div style="font-size:16px;font-weight:700;color:#e6edf3;margin-bottom:6px;">📊 Excelインポート確認</div>
+    <div style="font-size:12px;color:#8b949e;margin-bottom:14px;">${rows.length}件を取り込みます。カテゴリを確認・修正してください。</div>`;
+
+  rows.forEach((row,i)=>{
+    const cat=cats[row.cat]||cats['other'];
+    const selectOpts=ALL.map(c=>`<option value="${c.key}"${c.key===row.cat?' selected':''}>${c.icon} ${c.label}</option>`).join('');
+    html+=`<div style="background:#1f2937;border-radius:8px;padding:10px 12px;margin-bottom:8px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+        <span style="font-size:12px;color:#8b949e">${row.date}</span>
+        <span style="font-size:15px;font-weight:700;color:#e6edf3">¥${row.amount.toLocaleString()}</span>
+      </div>
+      <select data-i="${i}" style="width:100%;background:#0d1117;border:1px solid #2d333b;color:#e6edf3;padding:8px;border-radius:6px;font-size:13px;" onchange="xlsRows[this.dataset.i].cat=this.value">
+        ${selectOpts}
+      </select>
+      ${row.memo?`<div style="font-size:11px;color:#8b949e;margin-top:4px;">📝 ${row.memo}</div>`:''}
+    </div>`;
+  });
+
+  html+=`<div style="display:flex;gap:8px;margin-top:6px;">
+    <button onclick="this.closest('div').parentElement.remove()" style="flex:1;padding:13px;background:#2d333b;border:none;border-radius:9px;color:#8b949e;font-size:14px;cursor:pointer;">キャンセル</button>
+    <button onclick="doImportXls()" style="flex:2;padding:13px;background:#0ea5e9;border:none;border-radius:9px;color:#fff;font-size:14px;font-weight:700;cursor:pointer;">✅ ${rows.length}件をインポート</button>
+  </div></div>`;
+
+  ov.innerHTML=html;
+  window.xlsRows=rows;
+  window.xlsOverlay=ov;
+  document.body.appendChild(ov);
+}
+
+function doImportXls(){
+  const rows=window.xlsRows||[];
+  let added=0,skipped=0;
+  rows.forEach(row=>{
+    // 重複チェック（同日・同額・同カテゴリ）
+    const dup=expenses.some(e=>e.date===row.date&&e.amount===row.amount&&e.cat===row.cat);
+    if(dup){skipped++;return;}
+    expenses.push({id:Date.now().toString()+Math.random(),date:row.date,cat:row.cat,amount:row.amount,memo:row.memo});
+    added++;
+  });
+  sv(SK,expenses);
+  if(window.xlsOverlay)window.xlsOverlay.remove();
+  alert(`✅ ${added}件をインポートしました${skipped?`\n（重複 ${skipped}件はスキップ）`:''}`);
+  curMonth=rows[0]?.date?.slice(0,7)||curMonth;
+  switchTab('input');
+}
+
+function upCfg(k,v){cfg[k]=parseInt(v)||0;sv(STK,cfg);render();}
+function upCfgF(k,v){cfg[k]=parseFloat(v)||0;sv(STK,cfg);render();}
+function upCfgS(k,v){cfg[k]=v;sv(STK,cfg);render();}
+
+function shiftM(d){const[y,m]=curMonth.split('-').map(Number),dt=new Date(y,m-1+d,1);curMonth=dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0');render();}
+function dl(blob,name){
+  // haisonikkoと同じ実装
+  if(navigator.share&&navigator.canShare){
+    var file=new File([blob],name,{type:blob.type});
+    if(navigator.canShare({files:[file]})){
+      navigator.share({files:[file],title:name}).catch(function(){});
+      return;
+    }
+  }
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=name;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+function showCopyModal(blob,name){
+  const reader=new FileReader();
+  reader.onload=()=>{
+    const ov=document.createElement('div');
+    ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:200;display:flex;align-items:flex-end;';
+    ov.innerHTML=`<div style="background:#161b22;border-radius:16px 16px 0 0;width:100%;padding:20px 16px 36px;max-height:80vh;overflow-y:auto;">
+      <div style="font-size:15px;font-weight:700;margin-bottom:8px;color:#e6edf3;">📋 ${name}</div>
+      <div style="font-size:12px;color:#f59e0b;margin-bottom:10px;">全選択してコピー → メモ帳などに貼り付けて保存してください</div>
+      <textarea readonly style="width:100%;height:200px;background:#0d1117;border:1px solid #2d333b;color:#e6edf3;padding:10px;border-radius:8px;font-size:11px;font-family:monospace;" onclick="this.select()">${reader.result}</textarea>
+      <button onclick="this.closest('div').parentElement.remove()" style="margin-top:12px;width:100%;padding:13px;background:#2d333b;border:none;border-radius:9px;color:#8b949e;font-size:14px;cursor:pointer;">閉じる</button>
+    </div>`;
+    document.body.appendChild(ov);
+    setTimeout(()=>ov.querySelector('textarea').select(),100);
+  };
+  reader.readAsText(blob);
+}
+
+function mk(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;}
+function mbtn(t,fn){const b=document.createElement('button');b.textContent=t;b.className='mbtn';b.onclick=fn;return b;}
+function slbl(t,purple){return mk('div','slabel'+(purple?' purple':''),t);}
+function emptyEl(icon,text){const d=mk('div','empty');d.innerHTML=`<div class="empty-icon">${icon}</div><div class="empty-text">${text}</div>`;return d;}
+function srow(label,onclick){const d=mk('div','srow');d.innerHTML=`<div class="srlbl">${label}</div>`;d.style.cursor='pointer';d.onclick=onclick;return d;}
+
+// ── START ──
+initYear();buildChips();render();
+</script>
+</body>
+</html>

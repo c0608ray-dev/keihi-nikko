@@ -161,13 +161,14 @@ const GROUPS=[
 const ALL=GROUPS.flatMap(g=>g.cats);
 const HOME_KEYS=['loan','ftax','finsure'];
 
-const SK='keihi-v3-exp',STK='keihi-v3-st',SIK='keihi-v3-inc',SLK='keihi-v3-loan';
+const SK='keihi-v3-exp',STK='keihi-v3-st',SIK='keihi-v3-inc',SLK='keihi-v3-loan',SNK='keihi-v3-nichiho';
 function ld(k,d){try{return JSON.parse(localStorage.getItem(k))||d;}catch{return d;}}
 function sv(k,v){localStorage.setItem(k,JSON.stringify(v));}
 
 let expenses=ld(SK,[]);
 let incomes=ld(SIK,{});// {YYYY-MM: 金額}
 let loanCfg=ld(SLK,{totalRepayment:0,financeCharge:0,numPayments:48,firstPayment:0,monthlyPayment:0,startYearMonth:''});
+let nichihoData=ld(SNK,null);// 配送日報アプリのJSONデータ
 let cfg=ld(STK,{carRatio:80,phoneRatio:50,haisoData:null,totalKm:0,
   totalFloor:0,officeFloor:0,parkingFloor:0,
   buildingCost:0,buildingStructure:'wood',buildingYear:2000});
@@ -279,10 +280,12 @@ function rPL(c){
   months.forEach(month=>{
     const mexp=expenses.filter(e=>e.date.startsWith(month));
     const mDed=mexp.reduce((s,e)=>s+Math.floor(e.amount*anbunRatio(e.cat)/100),0);
-    // haisonikkoデータがあれば自動、なければ手入力値を使う
+    // 優先順位：①日報アプリ入金確認済み > ②haisonikko合計 > ③手入力
+    const nichihoIncome=getNichihoIncome(month);// 入金確認済みならnull以外
     const autoIncome=haisoIncome[month]||0;
     const manualIncome=incomes[month]||0;
-    const mIncome=autoIncome>0?autoIncome:manualIncome;
+    const mIncome=nichihoIncome!==null?nichihoIncome:autoIncome>0?autoIncome:manualIncome;
+    const incomeSource=nichihoIncome!==null?'confirmed':autoIncome>0?'haiso':'manual';
     const net=mIncome-mDed;
     yearIncome+=mIncome;
     yearExp+=mDed;
@@ -298,7 +301,12 @@ function rPL(c){
     // 売上行
     const ir=mk('div','srow');
     ir.innerHTML=`<div><div class="srlbl">💰 売上</div>${autoIncome>0?`<div class="srsub" style="color:var(--accent2)">haisonikkoから自動取得</div>`:'<div class="srsub">手動入力</div>'}</div>`;
-    if(autoIncome>0){
+    if(incomeSource==='confirmed'){
+      ir.querySelector('.srlbl').textContent='💰 売上（請求額・税込）';
+      ir.querySelector('.srsub').textContent='✅ 入金確認済み';ir.querySelector('.srsub').style.color='var(--green)';
+      const av=mk('div','');av.style.cssText='font-size:16px;font-weight:700;color:var(--green);';av.textContent='¥'+nichihoIncome.toLocaleString();
+      ir.appendChild(av);
+    }else if(incomeSource==='haiso'){
       const av=mk('div','');av.style.cssText='font-size:16px;font-weight:700;color:var(--accent2);';av.textContent='¥'+autoIncome.toLocaleString();
       ir.appendChild(av);
     }else{
@@ -404,6 +412,17 @@ function rSummary(c){
 
 // ── SETTINGS ──
 function rSettings(c){
+  // 配送日報アプリ連携
+  const sn=mk('div','section');sn.appendChild(slbl('📋 配送日報アプリ 連携'));
+  const nb=mk('div','import-box'+(nichihoData?' import-success':''));
+  nb.innerHTML=nichihoData
+    ?`<div style="font-size:32px;margin-bottom:8px">✅</div><div style="font-size:14px;font-weight:700;color:var(--green)">日報データ読み込み済み</div><div style="font-size:12px;color:var(--text2)">入金確認済みの月の請求額を損益タブに反映 ／ タップして更新</div>`
+    :`<div style="font-size:32px;margin-bottom:8px">📂</div><div style="font-size:14px;font-weight:700;color:var(--text)">配送日報アプリのJSONを読み込む</div><div style="font-size:12px;color:var(--text2)">入金確認済み月の請求額を損益に自動反映</div>`;
+  nb.style.cssText='border:2px dashed var(--border);border-radius:10px;padding:20px;text-align:center;cursor:pointer;margin-bottom:10px;';
+  nb.onclick=()=>document.getElementById('nfi').click();
+  const nfi=document.createElement('input');nfi.type='file';nfi.accept='.json';nfi.id='nfi';nfi.style.display='none';nfi.onchange=impNichiho;
+  sn.appendChild(nb);sn.appendChild(nfi);c.appendChild(sn);
+
   // haisonikko
   const s1=mk('div','section');s1.appendChild(slbl('haisonikko 連携'));
   const ib=mk('div','import-box'+(cfg.haisoData?' import-success':''));
@@ -513,6 +532,31 @@ function addExp(){
 function delExp(id){if(!confirm('削除しますか？'))return;expenses=expenses.filter(e=>e.id!==id);sv(SK,expenses);render();}
 
 // ── IMPORT / EXPORT ──
+function impNichiho(e){
+  const file=e.target.files[0];if(!file)return;
+  const r=new FileReader();r.onload=ev=>{
+    try{
+      const d=JSON.parse(ev.target.result);
+      if(!d.records||!d.invTrack){alert('配送日報アプリのファイルではありません');return;}
+      nichihoData=d;sv(SNK,nichihoData);
+      const confirmedMonths=Object.entries(d.invTrack).filter(([,v])=>v.confirmed).length;
+      alert(`✅ 読み込み完了\n入金確認済み月：${confirmedMonths}ヶ月`);
+      render();
+    }catch{alert('読み込み失敗');}
+  };
+  r.readAsText(file);e.target.value='';
+}
+function getNichihoIncome(ym){
+  if(!nichihoData)return null;
+  const track=nichihoData.invTrack||{};
+  if(!track[ym]||!track[ym].confirmed)return null;// 入金未確認はnull
+  const taxRate=parseFloat((nichihoData.invSettings||{}).taxRate)||10;
+  const recs=(nichihoData.records||[]).filter(r=>r.date&&r.date.startsWith(ym));
+  const subtotal=recs.reduce((s,r)=>s+(parseFloat(r.itemAmount)||0),0);
+  const tax=Math.floor(subtotal*taxRate/100);
+  return subtotal+tax;
+}
+
 function impHaiso(e){
   const file=e.target.files[0];if(!file)return;
   const r=new FileReader();r.onload=ev=>{try{const d=JSON.parse(ev.target.result);if(!d.records){alert('haisonikkoのファイルではありません');return;}cfg.haisoData=d;sv(STK,cfg);alert('✅ 読み込み完了');render();}catch{alert('読み込み失敗');}};

@@ -97,6 +97,9 @@ textarea{resize:none;height:60px;font-size:13px;}
 .depr-val{font-size:20px;font-weight:700;color:var(--purple);}
 .depr-sub{font-size:11px;color:var(--text2);margin-top:3px;}
 .warn-box{background:#1a0a00;border:1px solid #92400e;border-radius:10px;padding:12px 14px;font-size:13px;color:var(--yellow);margin-bottom:10px;}
+.import-box{border:2px dashed var(--border);border-radius:10px;padding:20px;text-align:center;cursor:pointer;margin-bottom:10px;transition:border-color 0.2s;}
+.import-box:hover{border-color:var(--accent);}
+.import-success{border-color:var(--green);background:#0a1f0a;}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
@@ -107,6 +110,7 @@ textarea{resize:none;height:60px;font-size:13px;}
 </div>
 <div class="tabs">
   <div class="tab active" onclick="switchTab('input')">経費入力</div>
+  <div class="tab" onclick="switchTab('pl')">損益</div>
   <div class="tab" onclick="switchTab('summary')">年次集計</div>
   <div class="tab" onclick="switchTab('settings')">設定</div>
 </div>
@@ -114,7 +118,7 @@ textarea{resize:none;height:60px;font-size:13px;}
 <button class="fab" id="fab" onclick="openModal()">＋ 経費を追加</button>
 
 <div class="modal-overlay" id="modal" style="display:none" onclick="closeModal(event)">
-  <div class="modal-box" onclick="e=>e.stopPropagation()">
+  <div class="modal-box" onclick="event.stopPropagation()">
     <div class="modal-title">経費を追加 <button class="mclose" onclick="closeModal()">✕</button></div>
     <div class="form-row">
       <div class="form-group"><label class="form-label">日付</label><input type="date" id="fd"></div>
@@ -132,27 +136,28 @@ textarea{resize:none;height:60px;font-size:13px;}
 <script>
 const GROUPS=[
   {label:'🚗 車両・通信費',cats:[
-    {key:'gas',     icon:'⛽',label:'ガソリン代',  type:'car',  kamoku:'車両費'},
-    {key:'etc',     icon:'🛣', label:'高速・ETC',  type:'car',  kamoku:'旅費交通費'},
-    {key:'parking', icon:'🅿️',label:'駐車場代',   type:'car',  kamoku:'旅費交通費'},
-    {key:'vehicle', icon:'🔧',label:'車両維持費',  type:'car',  kamoku:'車両費'},
-    {key:'phone',   icon:'📱',label:'通信費',      type:'phone',kamoku:'通信費'},
-    {key:'other',   icon:'📦',label:'その他',      type:'full', kamoku:'雑費'},
+    {key:'gas',     icon:'⛽',label:'ガソリン代',  type:'car',  kamoku:'車両費',     zei:'課対仕入10%'},
+    {key:'etc',     icon:'🛣', label:'高速・ETC',  type:'car',  kamoku:'旅費交通費', zei:'課対仕入10%'},
+    {key:'parking', icon:'🅿️',label:'駐車場代',   type:'car',  kamoku:'旅費交通費', zei:'課対仕入10%'},
+    {key:'vehicle', icon:'🔧',label:'車両維持費',  type:'car',  kamoku:'車両費',     zei:'課対仕入10%'},
+    {key:'phone',   icon:'📱',label:'通信費',      type:'phone',kamoku:'通信費',     zei:'課対仕入10%'},
+    {key:'other',   icon:'📦',label:'その他',      type:'full', kamoku:'雑費',       zei:'課対仕入10%'},
   ]},
   {label:'🏠 自宅経費（持ち家）',cats:[
-    {key:'loan',    icon:'🏠',label:'ローン利息',  type:'home', kamoku:'利子割引料'},
-    {key:'ftax',    icon:'📋',label:'固定資産税',  type:'home', kamoku:'租税公課'},
-    {key:'finsure', icon:'🔥',label:'火災保険料',  type:'home', kamoku:'損害保険料'},
+    {key:'loan',    icon:'🏠',label:'ローン利息',  type:'home', kamoku:'利子割引料', zei:'非課税'},
+    {key:'ftax',    icon:'📋',label:'固定資産税',  type:'home', kamoku:'租税公課',   zei:'対象外'},
+    {key:'finsure', icon:'🔥',label:'火災保険料',  type:'home', kamoku:'損害保険料', zei:'非課税'},
   ]}
 ];
 const ALL=GROUPS.flatMap(g=>g.cats);
 const HOME_KEYS=['loan','ftax','finsure'];
 
-const SK='keihi-v3-exp',STK='keihi-v3-st';
+const SK='keihi-v3-exp',STK='keihi-v3-st',SIK='keihi-v3-inc';
 function ld(k,d){try{return JSON.parse(localStorage.getItem(k))||d;}catch{return d;}}
 function sv(k,v){localStorage.setItem(k,JSON.stringify(v));}
 
 let expenses=ld(SK,[]);
+let incomes=ld(SIK,{});// {YYYY-MM: 金額}
 let cfg=ld(STK,{carRatio:80,phoneRatio:50,haisoData:null,totalKm:0,
   totalFloor:0,officeFloor:0,parkingFloor:0,
   buildingCost:0,buildingStructure:'wood',buildingYear:2000});
@@ -202,7 +207,7 @@ function changeYear(){curYear=document.getElementById('yearSel').value;curMonth=
 
 function switchTab(t){
   tab=t;
-  document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('active',['input','summary','settings'][i]===t));
+  document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('active',['input','pl','summary','settings'][i]===t));
   document.getElementById('fab').style.display=t==='input'?'flex':'none';
   render();
 }
@@ -210,6 +215,7 @@ function switchTab(t){
 function render(){
   const c=document.getElementById('content');c.innerHTML='';
   if(tab==='input')rInput(c);
+  else if(tab==='pl')rPL(c);
   else if(tab==='summary')rSummary(c);
   else rSettings(c);
 }
@@ -235,6 +241,91 @@ function rInput(c){
   foot.innerHTML=`<span style="font-size:13px;color:var(--text2)">${mexp.length}件</span><div style="text-align:right"><div style="font-size:16px;font-weight:700">¥${total.toLocaleString()}</div><div style="font-size:11px;color:var(--green)">控除 ¥${dedTot.toLocaleString()}</div></div>`;
   card.appendChild(foot);
   const sec=mk('div','section');sec.appendChild(card);c.appendChild(sec);
+}
+
+// ── P&L ──
+function rPL(c){
+  const nav=mk('div','mnav');
+  nav.innerHTML=`<div class="mlbl">${curYear}年 月次損益</div>`;
+  c.appendChild(nav);
+
+  const months=[];
+  for(let m=1;m<=12;m++)months.push(curYear+'-'+String(m).padStart(2,'0'));
+
+  let yearIncome=0,yearExp=0;
+
+  // haisonikkoから月別売上を自動取得
+  const haisoIncome={};
+  if(cfg.haisoData&&cfg.haisoData.records){
+    cfg.haisoData.records.filter(r=>r.date&&r.date.startsWith(curYear)).forEach(r=>{
+      const mon=r.date.slice(0,7);
+      const earn=parseFloat(r.earnings||r.income||r.sales||r.amount||0);
+      if(earn>0)haisoIncome[mon]=(haisoIncome[mon]||0)+earn;
+    });
+  }
+
+  const sec=mk('div','section');
+
+  months.forEach(month=>{
+    const mexp=expenses.filter(e=>e.date.startsWith(month));
+    const mDed=mexp.reduce((s,e)=>s+Math.floor(e.amount*anbunRatio(e.cat)/100),0);
+    // haisonikkoデータがあれば自動、なければ手入力値を使う
+    const autoIncome=haisoIncome[month]||0;
+    const manualIncome=incomes[month]||0;
+    const mIncome=autoIncome>0?autoIncome:manualIncome;
+    const net=mIncome-mDed;
+    yearIncome+=mIncome;
+    yearExp+=mDed;
+
+    const card=mk('div','card');
+    card.style.marginBottom='8px';
+
+    // 月ヘッダー
+    const mh=mk('div','');
+    mh.style.cssText='padding:10px 14px;background:var(--surface2);display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);';
+    mh.innerHTML=`<span style="font-size:14px;font-weight:700;color:var(--text)">${parseInt(month.slice(5))}月</span>${mIncome>0?`<span style="font-size:13px;font-weight:700;color:${net>=0?'var(--green)':'var(--red)'}">手残り ${net>=0?'+':''}¥${net.toLocaleString()}</span>`:'<span style="font-size:12px;color:var(--text3)">売上未入力</span>'}`;
+
+    // 売上行
+    const ir=mk('div','srow');
+    ir.innerHTML=`<div><div class="srlbl">💰 売上</div>${autoIncome>0?`<div class="srsub" style="color:var(--accent2)">haisonikkoから自動取得</div>`:'<div class="srsub">手動入力</div>'}</div>`;
+    if(autoIncome>0){
+      const av=mk('div','');av.style.cssText='font-size:16px;font-weight:700;color:var(--accent2);';av.textContent='¥'+autoIncome.toLocaleString();
+      ir.appendChild(av);
+    }else{
+      const wrap=mk('div','');wrap.style.cssText='display:flex;align-items:center;gap:4px;';
+      const inp=document.createElement('input');inp.type='number';inp.className='sinput';inp.style.width='130px';
+      inp.value=manualIncome||'';inp.placeholder='0';inp.dataset.month=month;
+      inp.onchange=function(){incomes[this.dataset.month]=parseInt(this.value)||0;sv(SIK,incomes);render();};
+      const yen=mk('span','');yen.style.color='var(--text2)';yen.textContent='円';
+      wrap.append(inp,yen);ir.appendChild(wrap);
+    }
+
+    // 経費行
+    const er=mk('div','srow');
+    er.innerHTML=`<div class="srlbl">📋 経費（按分後）</div><div style="font-size:15px;font-weight:700;color:var(--red)">-¥${mDed.toLocaleString()}</div>`;
+
+    // 手残り行
+    const nr=mk('div','');
+    nr.style.cssText=`padding:10px 14px;background:${net>=0?'#071a07':'#1a0700'};border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;`;
+    nr.innerHTML=`<span style="font-size:13px;font-weight:700;color:var(--text2)">手残り</span><span style="font-size:18px;font-weight:700;color:${net>=0?'var(--green)':'var(--red)'}">${mIncome>0?(net>=0?'+':'')+'¥'+net.toLocaleString():'—'}</span>`;
+
+    card.append(mh,ir,er,nr);
+    sec.appendChild(card);
+  });
+  c.appendChild(sec);
+
+  // 年間サマリー
+  const yearNet=yearIncome-yearExp;
+  const ys=mk('div','section');
+  const ycard=mk('div','');
+  ycard.style.cssText='background:#0c1f2e;border:1px solid var(--accent);border-radius:10px;padding:16px;margin-bottom:10px;';
+  ycard.innerHTML=`
+    <div style="font-size:12px;color:var(--text2);font-weight:700;letter-spacing:1px;margin-bottom:12px;">📊 ${curYear}年 年間サマリー</div>
+    <div class="arow"><span class="albl">年間売上合計</span><span class="aval ac">¥${yearIncome.toLocaleString()}</span></div>
+    <div class="arow"><span class="albl">年間経費合計（按分後）</span><span class="aval" style="color:var(--red)">-¥${yearExp.toLocaleString()}</span></div>
+    <div class="arow" style="border-bottom:none;padding-top:10px;"><span class="albl" style="font-size:14px;font-weight:700;color:var(--text)">年間手残り</span><span style="font-size:22px;font-weight:700;color:${yearNet>=0?'var(--green)':'var(--red)'}">${yearIncome>0?(yearNet>=0?'+':'')+'¥'+yearNet.toLocaleString():'—'}</span></div>
+  `;
+  ys.appendChild(ycard);c.appendChild(ys);
 }
 
 // ── SUMMARY ──
@@ -297,7 +388,7 @@ function rSummary(c){
 
   // CSV
   const s4=mk('div','section');
-  const eb=document.createElement('button');eb.className='btn btn-green';eb.textContent='📥 CSVエクスポート（freee・弥生対応）';eb.onclick=exportCSV;
+  const eb=document.createElement('button');eb.className='btn btn-green';eb.textContent='📥 弥生オンライン インポート用CSV';eb.onclick=exportYayoi;
   s4.appendChild(eb);const sp=mk('div','');sp.style.height='12px';s4.appendChild(sp);c.appendChild(s4);
 }
 
@@ -397,13 +488,22 @@ function impHaiso(e){
   const r=new FileReader();r.onload=ev=>{try{const d=JSON.parse(ev.target.result);if(!d.records){alert('haisonikkoのファイルではありません');return;}cfg.haisoData=d;sv(STK,cfg);alert('✅ 読み込み完了');render();}catch{alert('読み込み失敗');}};
   r.readAsText(file);e.target.value='';
 }
-function exportCSV(){
+function exportYayoi(){
   const yexp=expenses.filter(e=>e.date.startsWith(curYear)).sort((a,b)=>a.date.localeCompare(b.date));
   const depr=calcDepr();
-  const rows=[['日付','勘定科目','カテゴリ','金額','事業按分%','経費控除額','メモ']];
-  yexp.forEach(e=>{const cat=getCat(e.cat),ratio=anbunRatio(e.cat);rows.push([e.date,cat.kamoku,cat.label,e.amount,ratio,Math.floor(e.amount*ratio/100),e.memo||'']);});
-  if(depr>0)rows.push([curYear+'-12-31','減価償却費','建物（事務室）',depr,100,depr,'定額法・面積按分済み']);
-  dl(new Blob(['\uFEFF'+rows.map(r=>r.map(v=>`"${v}"`).join(',')).join('\n')],{type:'text/csv;charset=utf-8'}),`経費_${curYear}.csv`);
+  // 弥生オンライン 仕訳インポート形式
+  const rows=[['取引日','借方勘定科目','借方補助科目','借方税区分','借方金額','貸方勘定科目','貸方補助科目','貸方税区分','貸方金額','摘要']];
+  yexp.forEach(e=>{
+    const cat=getCat(e.cat),ratio=anbunRatio(e.cat),ded=Math.floor(e.amount*ratio/100);
+    if(ded<=0)return;
+    const dateStr=e.date.replace(/-/g,'/');
+    const memo=[cat.label,e.memo].filter(Boolean).join(' ');
+    rows.push([dateStr,cat.kamoku,'',cat.zei||'',ded,'事業主借','','',ded,memo]);
+  });
+  if(depr>0){
+    rows.push([curYear+'/12/31','減価償却費','','対象外',depr,'建物','','対象外',depr,'建物減価償却（定額法・事務室按分済み）']);
+  }
+  dl(new Blob(['\uFEFF'+rows.map(r=>r.map(v=>`"${v}"`).join(',')).join('\n')],{type:'text/csv;charset=utf-8'}),`弥生インポート_${curYear}.csv`);
 }
 function expJSON(){dl(new Blob([JSON.stringify({expenses,cfg,exportedAt:new Date().toISOString()},null,2)],{type:'application/json'}),`経費BK_${tod()}.json`);}
 function restJSON(e){

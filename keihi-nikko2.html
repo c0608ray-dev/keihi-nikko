@@ -149,19 +149,21 @@ const GROUPS=[
     {key:'vehicle', icon:'🔧',label:'車両維持費',      type:'car',  kamoku:'車両費',     zei:'課対仕入10%'},
     {key:'carloan', icon:'💳',label:'車両ローン利息',  type:'full', kamoku:'利子割引料', zei:'非課税'},
     {key:'carins',  icon:'🛡',label:'任意保険',        type:'car',  kamoku:'損害保険料', zei:'非課税'},
-    {key:'phone',   icon:'📱',label:'通信費',          type:'phone',kamoku:'通信費',     zei:'課対仕入10%'},
-    {key:'other',   icon:'📦',label:'その他',          type:'full', kamoku:'雑費',       zei:'課対仕入10%'},
+    {key:'phone',   icon:'📱',label:'通信費（スマホ）', type:'phone',kamoku:'通信費',     zei:'課対仕入10%'},
+    {key:'net',     icon:'🌐',label:'ネット回線',       type:'net',  kamoku:'通信費',     zei:'課対仕入10%'},
+    {key:'other',   icon:'📦',label:'その他',           type:'full', kamoku:'雑費',       zei:'課対仕入10%'},
   ]},
   {label:'🏠 自宅経費（持ち家）',cats:[
     {key:'loan',    icon:'🏠',label:'ローン利息',  type:'home', kamoku:'利子割引料', zei:'非課税'},
     {key:'ftax',    icon:'📋',label:'固定資産税',  type:'home', kamoku:'租税公課',   zei:'対象外'},
     {key:'finsure', icon:'🔥',label:'火災保険料',  type:'home', kamoku:'損害保険料', zei:'非課税'},
+    {key:'elec',    icon:'💡',label:'電気代',      type:'home', kamoku:'水道光熱費', zei:'課対仕入10%'},
   ]}
 ];
 const ALL=GROUPS.flatMap(g=>g.cats);
 const HOME_KEYS=['loan','ftax','finsure'];
 
-const SK='keihi-v3-exp',STK='keihi-v3-st',SIK='keihi-v3-inc',SLK='keihi-v3-loan',SNK='keihi-v3-nichiho';
+const SK='keihi-v3-exp',STK='keihi-v3-st',SIK='keihi-v3-inc',SLK='keihi-v3-loan',SNK='keihi-v3-nichiho',SBK='keihi-v3-booth';
 function ld(k,d){try{return JSON.parse(localStorage.getItem(k))||d;}catch{return d;}}
 function sv(k,v){localStorage.setItem(k,JSON.stringify(v));}
 
@@ -169,7 +171,8 @@ let expenses=ld(SK,[]);
 let incomes=ld(SIK,{});// {YYYY-MM: 金額}
 let loanCfg=ld(SLK,{totalRepayment:0,financeCharge:0,numPayments:48,firstPayment:0,monthlyPayment:0,startYearMonth:''});
 let nichihoData=ld(SNK,null);// 配送日報アプリのJSONデータ
-let cfg=ld(STK,{carRatio:80,phoneRatio:50,haisoData:null,totalKm:0,
+let boothData=ld(SBK,null);// BOOTH売上日報のJSONデータ
+let cfg=ld(STK,{carRatio:80,phoneRatio:50,netRatio:70,haisoData:null,totalKm:0,
   totalFloor:0,officeFloor:0,parkingFloor:0,
   buildingCost:0,buildingStructure:'wood',buildingYear:2000});
 
@@ -202,8 +205,9 @@ function calcDepr(){
   return Math.floor(bc*0.9*(rates[bs]||0.046)*(of/tf));
 }
 function anbunRatio(cat){
-  if(cat==='other')return 100;
+  if(cat==='other'||cat==='carloan')return 100;
   if(cat==='phone')return cfg.phoneRatio;
+  if(cat==='net')return cfg.netRatio;
   if(HOME_KEYS.includes(cat))return homeAnbun().office;
   return carAnbun().ratio;
 }
@@ -284,8 +288,10 @@ function rPL(c){
     const nichihoIncome=getNichihoIncome(month);// 入金確認済みならnull以外
     const autoIncome=haisoIncome[month]||0;
     const manualIncome=incomes[month]||0;
-    const mIncome=nichihoIncome!==null?nichihoIncome:autoIncome>0?autoIncome:manualIncome;
+    const deliveryIncome=nichihoIncome!==null?nichihoIncome:autoIncome>0?autoIncome:manualIncome;
     const incomeSource=nichihoIncome!==null?'confirmed':autoIncome>0?'haiso':'manual';
+    const boothIncome=getBoothIncome(month);// BOOTH売上（入金確認済みのみ）
+    const mIncome=deliveryIncome+boothIncome;
     const net=mIncome-mDed;
     yearIncome+=mIncome;
     yearExp+=mDed;
@@ -316,6 +322,14 @@ function rPL(c){
       inp.onchange=function(){incomes[this.dataset.month]=parseInt(this.value)||0;sv(SIK,incomes);render();};
       const yen=mk('span','');yen.style.color='var(--text2)';yen.textContent='円';
       wrap.append(inp,yen);ir.appendChild(wrap);
+    }
+
+    // BOOTH売上行（入金確認済みがある場合のみ表示）
+    if(boothIncome>0){
+      const br=mk('div','srow');
+      br.style.borderTop='1px solid var(--border)';
+      br.innerHTML=`<div><div class="srlbl">🛍 BOOTH売上</div><div class="srsub" style="color:var(--green)">✅ 入金確認済み</div></div><div style="font-size:16px;font-weight:700;color:var(--green)">¥${boothIncome.toLocaleString()}</div>`;
+      mc.appendChild(br);
     }
 
     // 経費行
@@ -399,7 +413,8 @@ function rSummary(c){
   const s3=mk('div','section');s3.appendChild(slbl('家事按分 詳細'));
   const ab1=mk('div','abox');
   ab1.innerHTML=`<div class="atitle">🚗 車両按分</div><div class="pbar"><div class="pfill" style="width:${ca.ratio}%"></div></div><div class="arow"><span class="albl">事業使用割合</span><span class="aval gr">${ca.ratio}%</span></div>${cfg.haisoData?`<div class="arow"><span class="albl">業務走行距離</span><span class="aval">${ca.bKm.toLocaleString()} km</span></div>`:''}
-  <div class="arow"><span class="albl">📱 通信費按分</span><span class="aval gr">${cfg.phoneRatio}%</span></div>`;
+  <div class="arow"><span class="albl">📱 通信費按分</span><span class="aval gr">${cfg.phoneRatio}%</span></div>
+  <div class="arow"><span class="albl">🌐 ネット回線按分</span><span class="aval gr">${cfg.netRatio}%</span></div>`;
   const ab2=mk('div','abox home');
   ab2.innerHTML=`<div class="atitle">🏠 自宅按分（面積割合）</div><div class="pbar"><div class="pfill pu" style="width:${ha.office}%"></div></div><div class="arow"><span class="albl">事務室</span><span class="aval pu">${ha.office}%（${cfg.officeFloor}㎡÷${cfg.totalFloor}㎡）</span></div>${cfg.parkingFloor?`<div class="arow"><span class="albl">駐車場（家屋内）</span><span class="aval pu">${ha.parking}%（${cfg.parkingFloor}㎡÷${cfg.totalFloor}㎡）</span></div>`:''}`;
   s3.appendChild(ab1);s3.appendChild(ab2);c.appendChild(s3);
@@ -422,6 +437,17 @@ function rSettings(c){
   nb.onclick=()=>document.getElementById('nfi').click();
   const nfi=document.createElement('input');nfi.type='file';nfi.accept='.json';nfi.id='nfi';nfi.style.display='none';nfi.onchange=impNichiho;
   sn.appendChild(nb);sn.appendChild(nfi);c.appendChild(sn);
+
+  // BOOTH売上日報連携
+  const sb=mk('div','section');sb.appendChild(slbl('🛍 BOOTH売上日報 連携'));
+  const bb=mk('div','import-box'+(boothData?' import-success':''));
+  bb.innerHTML=boothData
+    ?`<div style="font-size:32px;margin-bottom:8px">✅</div><div style="font-size:14px;font-weight:700;color:var(--green)">BOOTHデータ読み込み済み</div><div style="font-size:12px;color:var(--text2)">入金確認済み月の売上を損益タブに反映 ／ タップして更新</div>`
+    :`<div style="font-size:32px;margin-bottom:8px">📂</div><div style="font-size:14px;font-weight:700;color:var(--text)">BOOTH売上日報のJSONを読み込む</div><div style="font-size:12px;color:var(--text2)">入金確認済み月の売上を損益に自動反映</div>`;
+  bb.style.cssText='border:2px dashed var(--border);border-radius:10px;padding:20px;text-align:center;cursor:pointer;margin-bottom:10px;';
+  bb.onclick=()=>document.getElementById('bfi').click();
+  const bfi=document.createElement('input');bfi.type='file';bfi.accept='.json';bfi.id='bfi';bfi.style.display='none';bfi.onchange=impBooth;
+  sb.appendChild(bb);sb.appendChild(bfi);c.appendChild(sb);
 
   // haisonikko
   const s1=mk('div','section');s1.appendChild(slbl('haisonikko 連携'));
@@ -447,6 +473,7 @@ function rSettings(c){
     <div class="srow"><div><div class="srlbl">🚗 車両按分</div><div class="srsub">${cfg.haisoData?'haisonikkoから自動計算':'手動設定'}</div></div>
     ${cfg.haisoData?`<span style="color:var(--green);font-weight:700">${carAnbun().ratio}%　自動</span>`:`<div style="display:flex;align-items:center;gap:4px"><input type="number" class="sinput" value="${cfg.carRatio}" min="0" max="100" onchange="upCfg('carRatio',this.value)"><span style="color:var(--text2)">%</span></div>`}</div>
     <div class="srow"><div><div class="srlbl">📱 通信費按分</div></div><div style="display:flex;align-items:center;gap:4px"><input type="number" class="sinput" value="${cfg.phoneRatio}" min="0" max="100" onchange="upCfg('phoneRatio',this.value)"><span style="color:var(--text2)">%</span></div></div>
+    <div class="srow"><div><div class="srlbl">🌐 ネット回線按分</div></div><div style="display:flex;align-items:center;gap:4px"><input type="number" class="sinput" value="${cfg.netRatio}" min="0" max="100" onchange="upCfg('netRatio',this.value)"><span style="color:var(--text2)">%</span></div></div>
     ${!cfg.haisoData?`<div class="srow"><div><div class="srlbl">年間総走行距離</div><div class="srsub">プライベート含む全走行距離</div></div><div style="display:flex;align-items:center;gap:4px"><input type="number" class="sinput" value="${cfg.totalKm}" min="0" onchange="upCfg('totalKm',this.value)"><span style="color:var(--text2)">km</span></div></div>`:''}
   `;
   s2.appendChild(c2);c.appendChild(s2);
@@ -556,7 +583,28 @@ function getNichihoIncome(ym){
   const tax=Math.floor(subtotal*taxRate/100);
   return subtotal+tax;
 }
+function getBoothIncome(ym){
+  if(!boothData)return 0;
+  const track=boothData.salesTrack||{};
+  if(!track[ym]||!track[ym].confirmed)return 0;// 入金未確認は0
+  return (boothData.records||[]).filter(r=>r.date&&r.date.startsWith(ym))
+    .reduce((s,r)=>s+(parseFloat(r.amount)||0),0);
+}
 
+function impBooth(e){
+  const file=e.target.files[0];if(!file)return;
+  const r=new FileReader();r.onload=ev=>{
+    try{
+      const d=JSON.parse(ev.target.result);
+      if(!d.appId||d.appId!=='booth-nikko'){alert('BOOTH売上日報のファイルではありません');return;}
+      boothData=d;sv(SBK,boothData);
+      const confirmedMonths=Object.entries(d.salesTrack||{}).filter(([,v])=>v.confirmed).length;
+      alert(`✅ 読み込み完了\n入金確認済み月：${confirmedMonths}ヶ月`);
+      render();
+    }catch{alert('読み込み失敗');}
+  };
+  r.readAsText(file);e.target.value='';
+}
 function impHaiso(e){
   const file=e.target.files[0];if(!file)return;
   const r=new FileReader();r.onload=ev=>{try{const d=JSON.parse(ev.target.result);if(!d.records){alert('haisonikkoのファイルではありません');return;}cfg.haisoData=d;sv(STK,cfg);alert('✅ 読み込み完了');render();}catch{alert('読み込み失敗');}};

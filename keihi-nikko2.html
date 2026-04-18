@@ -100,6 +100,13 @@ textarea{resize:none;height:60px;font-size:13px;}
 .import-box{border:2px dashed var(--border);border-radius:10px;padding:20px;text-align:center;cursor:pointer;margin-bottom:10px;transition:border-color 0.2s;}
 .import-box:hover{border-color:var(--accent);}
 .import-success{border-color:var(--green);background:#0a1f0a;}
+.loan-result{background:#0c1f2e;border:1px solid var(--accent);border-radius:8px;padding:14px;margin-top:10px;}
+.loan-result-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--border);font-size:13px;}
+.loan-result-row:last-child{border-bottom:none;}
+.loan-result-lbl{color:var(--text2);}
+.loan-result-val{font-weight:700;color:var(--text);}
+.loan-result-val.hi{color:var(--accent2);font-size:18px;}
+.loan-add-btn{width:100%;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:10px;letter-spacing:1px;}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
@@ -136,12 +143,14 @@ textarea{resize:none;height:60px;font-size:13px;}
 <script>
 const GROUPS=[
   {label:'🚗 車両・通信費',cats:[
-    {key:'gas',     icon:'⛽',label:'ガソリン代',  type:'car',  kamoku:'車両費',     zei:'課対仕入10%'},
-    {key:'etc',     icon:'🛣', label:'高速・ETC',  type:'car',  kamoku:'旅費交通費', zei:'課対仕入10%'},
-    {key:'parking', icon:'🅿️',label:'駐車場代',   type:'car',  kamoku:'旅費交通費', zei:'課対仕入10%'},
-    {key:'vehicle', icon:'🔧',label:'車両維持費',  type:'car',  kamoku:'車両費',     zei:'課対仕入10%'},
-    {key:'phone',   icon:'📱',label:'通信費',      type:'phone',kamoku:'通信費',     zei:'課対仕入10%'},
-    {key:'other',   icon:'📦',label:'その他',      type:'full', kamoku:'雑費',       zei:'課対仕入10%'},
+    {key:'gas',     icon:'⛽',label:'ガソリン代',      type:'car',  kamoku:'車両費',     zei:'課対仕入10%'},
+    {key:'etc',     icon:'🛣', label:'高速・ETC',      type:'car',  kamoku:'旅費交通費', zei:'課対仕入10%'},
+    {key:'parking', icon:'🅿️',label:'駐車場代',       type:'car',  kamoku:'旅費交通費', zei:'課対仕入10%'},
+    {key:'vehicle', icon:'🔧',label:'車両維持費',      type:'car',  kamoku:'車両費',     zei:'課対仕入10%'},
+    {key:'carloan', icon:'💳',label:'車両ローン利息',  type:'full', kamoku:'利子割引料', zei:'非課税'},
+    {key:'carins',  icon:'🛡',label:'任意保険',        type:'car',  kamoku:'損害保険料', zei:'非課税'},
+    {key:'phone',   icon:'📱',label:'通信費',          type:'phone',kamoku:'通信費',     zei:'課対仕入10%'},
+    {key:'other',   icon:'📦',label:'その他',          type:'full', kamoku:'雑費',       zei:'課対仕入10%'},
   ]},
   {label:'🏠 自宅経費（持ち家）',cats:[
     {key:'loan',    icon:'🏠',label:'ローン利息',  type:'home', kamoku:'利子割引料', zei:'非課税'},
@@ -152,12 +161,13 @@ const GROUPS=[
 const ALL=GROUPS.flatMap(g=>g.cats);
 const HOME_KEYS=['loan','ftax','finsure'];
 
-const SK='keihi-v3-exp',STK='keihi-v3-st',SIK='keihi-v3-inc';
+const SK='keihi-v3-exp',STK='keihi-v3-st',SIK='keihi-v3-inc',SLK='keihi-v3-loan';
 function ld(k,d){try{return JSON.parse(localStorage.getItem(k))||d;}catch{return d;}}
 function sv(k,v){localStorage.setItem(k,JSON.stringify(v));}
 
 let expenses=ld(SK,[]);
 let incomes=ld(SIK,{});// {YYYY-MM: 金額}
+let loanCfg=ld(SLK,{totalRepayment:0,financeCharge:0,numPayments:48,firstPayment:0,monthlyPayment:0,startYearMonth:''});
 let cfg=ld(STK,{carRatio:80,phoneRatio:50,haisoData:null,totalKm:0,
   totalFloor:0,officeFloor:0,parkingFloor:0,
   buildingCost:0,buildingStructure:'wood',buildingYear:2000});
@@ -259,7 +269,7 @@ function rPL(c){
   if(cfg.haisoData&&cfg.haisoData.records){
     cfg.haisoData.records.filter(r=>r.date&&r.date.startsWith(curYear)).forEach(r=>{
       const mon=r.date.slice(0,7);
-      const earn=parseFloat(r.earnings||r.income||r.sales||r.amount||0);
+      const earn=parseFloat(r.itemAmount||0);
       if(earn>0)haisoIncome[mon]=(haisoIncome[mon]||0)+earn;
     });
   }
@@ -403,7 +413,13 @@ function rSettings(c){
   ib.style.cssText='border:2px dashed var(--border);border-radius:10px;padding:20px;text-align:center;cursor:pointer;margin-bottom:10px;';
   ib.onclick=()=>document.getElementById('jfi').click();
   const jfi=document.createElement('input');jfi.type='file';jfi.accept='.json';jfi.id='jfi';jfi.style.display='none';jfi.onchange=impHaiso;
-  s1.appendChild(ib);s1.appendChild(jfi);c.appendChild(s1);
+  s1.appendChild(ib);s1.appendChild(jfi);
+  if(cfg.haisoData){
+    const fb=document.createElement('button');fb.className='btn btn-primary';fb.style.marginTop='8px';
+    fb.textContent='⛽ ガソリン代を取り込む';fb.onclick=importFuelCosts;
+    s1.appendChild(fb);
+  }
+  c.appendChild(s1);
 
   // 車両按分
   const s2=mk('div','section');s2.appendChild(slbl('車両・通信費 按分設定'));
@@ -444,6 +460,20 @@ function rSettings(c){
   const drbox=mk('div','depr-box');
   drbox.innerHTML=`<div class="depr-lbl">年間控除額（${curYear}年）</div><div class="depr-val">¥${depr.toLocaleString()}</div><div class="depr-sub">取得価額×0.9×償却率${rates[cfg.buildingStructure]||'0.046'}×事務室${ha2.office}%　定額法</div>`;
   c4.appendChild(drbox);s4.appendChild(c4);c.appendChild(s4);
+
+  // ローン計算
+  const sl=mk('div','section');sl.appendChild(slbl('🚗 車両ローン 利息計算'));
+  const cl=mk('div','card');
+  cl.innerHTML=`
+    <div class="srow"><div><div class="srlbl">総支払額</div><div class="srsub">元本＋手数料の合計</div></div><div style="display:flex;align-items:center;gap:4px"><input type="number" class="sinput" style="width:130px" value="${loanCfg.totalRepayment||''}" placeholder="0" id="l-total" onchange="upLoan('totalRepayment',this.value)"><span style="color:var(--text2)">円</span></div></div>
+    <div class="srow"><div><div class="srlbl">分割払い手数料</div><div class="srsub">契約書の手数料合計額</div></div><div style="display:flex;align-items:center;gap:4px"><input type="number" class="sinput" style="width:130px" value="${loanCfg.financeCharge||''}" placeholder="0" id="l-charge" onchange="upLoan('financeCharge',this.value)"><span style="color:var(--text2)">円</span></div></div>
+    <div class="srow"><div><div class="srlbl">支払い回数</div></div><div style="display:flex;align-items:center;gap:4px"><input type="number" class="sinput" value="${loanCfg.numPayments||48}" min="1" id="l-n" onchange="upLoan('numPayments',this.value)"><span style="color:var(--text2)">回</span></div></div>
+    <div class="srow"><div><div class="srlbl">初回支払額</div></div><div style="display:flex;align-items:center;gap:4px"><input type="number" class="sinput" style="width:130px" value="${loanCfg.firstPayment||''}" placeholder="0" id="l-first" onchange="upLoan('firstPayment',this.value)"><span style="color:var(--text2)">円</span></div></div>
+    <div class="srow"><div><div class="srlbl">通常月額</div></div><div style="display:flex;align-items:center;gap:4px"><input type="number" class="sinput" style="width:130px" value="${loanCfg.monthlyPayment||''}" placeholder="0" id="l-monthly" onchange="upLoan('monthlyPayment',this.value)"><span style="color:var(--text2)">円</span></div></div>
+    <div class="srow"><div><div class="srlbl">支払い開始年月</div><div class="srsub">初回引き落とし月</div></div><input type="month" class="sinput" style="width:140px" value="${loanCfg.startYearMonth||''}" id="l-start" onchange="upLoanS('startYearMonth',this.value)"></div>
+    ${renderLoanResult()}
+  `;
+  sl.appendChild(cl);c.appendChild(sl);
 
   // データ管理
   const s5=mk('div','section');s5.appendChild(slbl('データ管理'));
@@ -487,6 +517,48 @@ function impHaiso(e){
   const file=e.target.files[0];if(!file)return;
   const r=new FileReader();r.onload=ev=>{try{const d=JSON.parse(ev.target.result);if(!d.records){alert('haisonikkoのファイルではありません');return;}cfg.haisoData=d;sv(STK,cfg);alert('✅ 読み込み完了');render();}catch{alert('読み込み失敗');}};
   r.readAsText(file);e.target.value='';
+}
+
+function importFuelCosts(){
+  if(!cfg.haisoData)return;
+  // fuelCostがある日を抽出
+  const fuelRecs=cfg.haisoData.records.filter(r=>r.date&&parseFloat(r.fuelCost)>0);
+  if(!fuelRecs.length){alert('給油データが見つかりませんでした');return;}
+
+  // 重複チェック（同日・同額・gas）
+  const newRecs=fuelRecs.filter(r=>{
+    const amt=parseInt(r.fuelCost);
+    return!expenses.some(e=>e.date===r.date&&e.amount===amt&&e.cat==='gas');
+  });
+
+  if(!newRecs.length){alert('取り込み済みのデータのみです（重複スキップ）');return;}
+
+  // プレビュー表示
+  const ov=document.createElement('div');
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:200;display:flex;align-items:flex-end;';
+  let html=`<div style="background:#161b22;border-radius:16px 16px 0 0;width:100%;max-width:480px;margin:0 auto;padding:20px 16px 36px;max-height:80vh;overflow-y:auto;">
+    <div style="font-size:16px;font-weight:700;color:#e6edf3;margin-bottom:6px;">⛽ ガソリン代 取り込み確認</div>
+    <div style="font-size:12px;color:#8b949e;margin-bottom:14px;">${newRecs.length}件を取り込みます（重複除外済み）</div>`;
+  newRecs.forEach(r=>{
+    html+=`<div style="background:#1f2937;border-radius:8px;padding:10px 12px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;">
+      <div><div style="font-size:13px;color:#e6edf3;">${r.date}</div><div style="font-size:11px;color:#8b949e;">${r.fuel}L給油${r.fuelEfficiency?'　燃費'+r.fuelEfficiency+'km/L':''}</div></div>
+      <div style="font-size:15px;font-weight:700;color:#e6edf3;">¥${parseInt(r.fuelCost).toLocaleString()}</div>
+    </div>`;
+  });
+  html+=`<div style="display:flex;gap:8px;margin-top:10px;">
+    <button onclick="this.closest('div').parentElement.remove()" style="flex:1;padding:13px;background:#2d333b;border:none;border-radius:9px;color:#8b949e;font-size:14px;cursor:pointer;">キャンセル</button>
+    <button id="fuel-import-ok" style="flex:2;padding:13px;background:#0ea5e9;border:none;border-radius:9px;color:#fff;font-size:14px;font-weight:700;cursor:pointer;">✅ ${newRecs.length}件を取り込む</button>
+  </div></div>`;
+  ov.innerHTML=html;
+  document.body.appendChild(ov);
+  document.getElementById('fuel-import-ok').onclick=()=>{
+    newRecs.forEach(r=>{
+      expenses.push({id:Date.now().toString()+Math.random(),date:r.date,cat:'gas',amount:parseInt(r.fuelCost),memo:r.fuel?r.fuel+'L給油':''});
+    });
+    sv(SK,expenses);ov.remove();
+    alert(`✅ ${newRecs.length}件のガソリン代を追加しました`);
+    switchTab('input');
+  };
 }
 function exportYayoi(){
   const yexp=expenses.filter(e=>e.date.startsWith(curYear)).sort((a,b)=>a.date.localeCompare(b.date));
@@ -640,6 +712,48 @@ function doImportXls(){
 function upCfg(k,v){cfg[k]=parseInt(v)||0;sv(STK,cfg);render();}
 function upCfgF(k,v){cfg[k]=parseFloat(v)||0;sv(STK,cfg);render();}
 function upCfgS(k,v){cfg[k]=v;sv(STK,cfg);render();}
+function upLoan(k,v){loanCfg[k]=parseInt(v)||0;sv(SLK,loanCfg);render();}
+function upLoanS(k,v){loanCfg[k]=v;sv(SLK,loanCfg);render();}
+
+function calcLoanPayment(payNum){
+  const{financeCharge:fc,numPayments:n}=loanCfg;
+  if(!fc||!n)return 0;
+  const base=Math.round(fc/n);
+  // 最終回は端数調整
+  return payNum===n?fc-base*(n-1):base;
+}
+function currentPayNum(){
+  if(!loanCfg.startYearMonth)return null;
+  const[sy,sm]=loanCfg.startYearMonth.split('-').map(Number);
+  const[cy,cm]=curMonth.split('-').map(Number);
+  const diff=(cy-sy)*12+(cm-sm)+1;
+  if(diff<1||diff>loanCfg.numPayments)return null;
+  return diff;
+}
+function renderLoanResult(){
+  const{totalRepayment:tr,financeCharge:fc,numPayments:n,firstPayment:fp,monthlyPayment:mp}=loanCfg;
+  if(!tr||!fc||!n)return '';
+  const principal=tr-fc;
+  const payNum=currentPayNum();
+  if(!payNum)return `<div class="loan-result"><div style="font-size:13px;color:var(--text2)">支払い開始年月を設定すると今月の利息を自動計算します</div></div>`;
+  const interest=calcLoanPayment(payNum);
+  const payment=payNum===1?fp:mp;
+  const principalPart=payment-interest;
+  return `<div class="loan-result">
+    <div class="loan-result-row"><span class="loan-result-lbl">📅 今月（${curMonth.replace('-','年')}月）</span><span class="loan-result-val">${payNum}回目 / ${n}回</span></div>
+    <div class="loan-result-row"><span class="loan-result-lbl">今月の支払額</span><span class="loan-result-val">¥${(payment||0).toLocaleString()}</span></div>
+    <div class="loan-result-row"><span class="loan-result-lbl">うち利息（利子割引料）</span><span class="loan-result-val hi">¥${interest.toLocaleString()}</span></div>
+    <div class="loan-result-row"><span class="loan-result-lbl">うち元本返済（経費外）</span><span class="loan-result-val">¥${principalPart.toLocaleString()}</span></div>
+    <button class="loan-add-btn" onclick="addLoanInterest(${interest})">＋ 利子割引料 ¥${interest.toLocaleString()} を今月の経費に追加</button>
+  </div>`;
+}
+function addLoanInterest(amount){
+  const date=curMonth+'-01';
+  expenses.push({id:Date.now().toString(),date,cat:'carloan',amount,memo:'車両ローン利息'});
+  sv(SK,expenses);
+  alert('✅ 追加しました（利子割引料・100%経費）');
+  switchTab('input');
+}
 
 function shiftM(d){const[y,m]=curMonth.split('-').map(Number),dt=new Date(y,m-1+d,1);curMonth=dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0');render();}
 function dl(blob,name){

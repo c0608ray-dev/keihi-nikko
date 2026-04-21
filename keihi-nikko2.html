@@ -165,7 +165,7 @@ const HOME_KEYS=['loan','ftax','finsure'];
 
 const SK='keihi-v3-exp',STK='keihi-v3-st',SIK='keihi-v3-inc',SLK='keihi-v3-loan',SNK='keihi-v3-nichiho',SBK='keihi-v3-booth';
 function ld(k,d){try{return JSON.parse(localStorage.getItem(k))||d;}catch{return d;}}
-function sv(k,v){localStorage.setItem(k,JSON.stringify(v));}
+function sv(k,v){try{localStorage.setItem(k,JSON.stringify(v));return true;}catch(e){if(e.name==='QuotaExceededError'||e.code===22){alert('⚠️ 保存容量がいっぱいです。\n古いデータをエクスポートして削除してください。');}return false;}}
 
 let expenses=ld(SK,[]);
 let incomes=ld(SIK,{});// {YYYY-MM: 金額}
@@ -177,7 +177,7 @@ let cfg=ld(STK,{carRatio:80,phoneRatio:50,netRatio:70,haisoData:null,totalKm:0,
   buildingCost:0,buildingStructure:'wood',buildingYear:2000});
 
 let tab='input',curMonth=tod().slice(0,7),curYear=tod().slice(0,4),selCat='gas';
-function tod(){return new Date().toISOString().slice(0,10);}
+function tod(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 
 // ── 按分計算 ──
 function carAnbun(){
@@ -554,7 +554,10 @@ function buildChips(){
 function addExp(){
   const date=document.getElementById('fd').value,amount=parseInt(document.getElementById('fa').value),memo=document.getElementById('fm').value.trim();
   if(!date||!amount||amount<=0){alert('日付と金額を入力してください');return;}
-  expenses.push({id:Date.now().toString(),date,cat:selCat,amount,memo});sv(SK,expenses);closeModal();curMonth=date.slice(0,7);render();
+  const newExp={id:Date.now().toString(),date,cat:selCat,amount,memo};
+  expenses.push(newExp);
+  if(!sv(SK,expenses)){expenses.pop();alert('保存失敗：容量超過です。古いデータを削除してください。');return;}
+  closeModal();curMonth=date.slice(0,7);render();
 }
 function delExp(id){if(!confirm('削除しますか？'))return;expenses=expenses.filter(e=>e.id!==id);sv(SK,expenses);render();}
 
@@ -565,7 +568,8 @@ function impNichiho(e){
     try{
       const d=JSON.parse(ev.target.result);
       if(!d.records||!d.invTrack){alert('配送日報アプリのファイルではありません');return;}
-      nichihoData=d;sv(SNK,nichihoData);
+      nichihoData=d;
+      if(!sv(SNK,nichihoData)){alert('保存失敗：容量超過です');return;}
       const confirmedMonths=Object.entries(d.invTrack).filter(([,v])=>v.confirmed).length;
       alert(`✅ 読み込み完了\n入金確認済み月：${confirmedMonths}ヶ月`);
       render();
@@ -644,10 +648,12 @@ function importFuelCosts(){
   ov.innerHTML=html;
   document.body.appendChild(ov);
   document.getElementById('fuel-import-ok').onclick=()=>{
+    const expensesBak=JSON.parse(JSON.stringify(expenses));
     newRecs.forEach(r=>{
       expenses.push({id:Date.now().toString()+Math.random(),date:r.date,cat:'gas',amount:parseInt(r.fuelCost),memo:r.fuel?r.fuel+'L給油':''});
     });
-    sv(SK,expenses);ov.remove();
+    if(!sv(SK,expenses)){expenses=expensesBak;alert('保存失敗：容量超過のため取り込みをキャンセルしました');return;}
+    ov.remove();
     alert(`✅ ${newRecs.length}件のガソリン代を追加しました`);
     switchTab('input');
   };
@@ -669,10 +675,10 @@ function exportYayoi(){
   }
   dl(new Blob(['\uFEFF'+rows.map(r=>r.map(v=>`"${v}"`).join(',')).join('\n')],{type:'text/csv;charset=utf-8'}),`弥生インポート_${curYear}.csv`);
 }
-function expJSON(){dl(new Blob([JSON.stringify({expenses,cfg,exportedAt:new Date().toISOString()},null,2)],{type:'application/json'}),`経費BK_${tod()}.json`);}
+function expJSON(){const now=new Date(),localIso=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0')+'T'+String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0')+':'+String(now.getSeconds()).padStart(2,'0');dl(new Blob([JSON.stringify({expenses,cfg,exportedAt:localIso},null,2)],{type:'application/json'}),`経費BK_${tod()}.json`);}
 function restJSON(e){
   const file=e.target.files[0];if(!file)return;
-  const r=new FileReader();r.onload=ev=>{try{const d=JSON.parse(ev.target.result);if(d.expenses){expenses=d.expenses;sv(SK,expenses);}if(d.cfg){cfg=d.cfg;sv(STK,cfg);}alert('✅ 復元しました');render();}catch{alert('失敗しました');}};
+  const r=new FileReader();r.onload=ev=>{try{const d=JSON.parse(ev.target.result);if(d.expenses){if(!sv(SK,d.expenses)){alert('復元失敗：容量超過です');return;}expenses=d.expenses;}if(d.cfg){if(!sv(STK,d.cfg)){alert('復元失敗：容量超過です');return;}cfg=d.cfg;}alert('✅ 復元しました');render();}catch{alert('復元に失敗しました');}};
   r.readAsText(file);e.target.value='';
 }
 
@@ -787,6 +793,7 @@ function showExcelPreview(rows){
 function doImportXls(){
   const rows=window.xlsRows||[];
   let added=0,skipped=0;
+  const expensesBak=JSON.parse(JSON.stringify(expenses));
   rows.forEach(row=>{
     // 重複チェック（同日・同額・同カテゴリ）
     const dup=expenses.some(e=>e.date===row.date&&e.amount===row.amount&&e.cat===row.cat);
@@ -794,7 +801,7 @@ function doImportXls(){
     expenses.push({id:Date.now().toString()+Math.random(),date:row.date,cat:row.cat,amount:row.amount,memo:row.memo});
     added++;
   });
-  sv(SK,expenses);
+  if(!sv(SK,expenses)){expenses=expensesBak;alert('保存失敗：容量超過のため取り込みをキャンセルしました');if(window.xlsOverlay)window.xlsOverlay.remove();return;}
   if(window.xlsOverlay)window.xlsOverlay.remove();
   alert(`✅ ${added}件をインポートしました${skipped?`\n（重複 ${skipped}件はスキップ）`:''}`);
   curMonth=rows[0]?.date?.slice(0,7)||curMonth;
